@@ -1,0 +1,21 @@
+[package]
+name = "dino-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Small OpenVINO vision inference CLI"
+license = "MIT"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+hf-hub = { version = "0.4", default-features = false, features = ["ureq"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "bmp", "tiff"] }
+openvino = { version = "0.11", features = ["runtime-linking"] }
+openvino-sys = { version = "0.11", features = ["runtime-linking"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+walkdir = "2"
+
+[profile.release]
+lto = "thin"
+strip = true

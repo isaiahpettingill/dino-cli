@@ -1,0 +1,16 @@
+name: Rust and OpenVINO CPU
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked
+      - run: cargo build --locked
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run --with openvino --with pillow python tests/smoke.py
