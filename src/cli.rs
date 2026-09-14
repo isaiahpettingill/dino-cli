@@ -24,6 +24,12 @@ pub struct Args {
     pub offline: bool,
     #[arg(long, global = true, default_value = "NPU")]
     pub device: String,
+    /// Explicit NPU platform (e.g. 3720 for Meteor Lake / Arrow Lake)
+    #[arg(long, global = true)]
+    pub npu_platform: Option<String>,
+    /// Select OpenVINO's plugin compiler or the compiler in the NPU driver
+    #[arg(long, global = true, value_enum)]
+    pub npu_compiler_type: Option<NpuCompilerType>,
     #[arg(long, global = true)]
     pub json: bool,
     /// Explicit Hugging Face-style image processor JSON
@@ -116,4 +122,85 @@ pub enum Command {
     Infer {
         image: PathBuf,
     },
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum NpuCompilerType {
+    Driver,
+    Plugin,
+    PreferPlugin,
+}
+impl NpuCompilerType {
+    pub fn property_value(self) -> &'static str {
+        match self {
+            Self::Driver => "DRIVER",
+            Self::Plugin => "PLUGIN",
+            Self::PreferPlugin => "PREFER_PLUGIN",
+        }
+    }
+}
+impl Args {
+    pub fn npu_properties(&self) -> anyhow::Result<Vec<(&'static str, String)>> {
+        let mut properties = Vec::new();
+        if self.npu_platform.is_some() || self.npu_compiler_type.is_some() {
+            anyhow::ensure!(
+                self.device == "NPU" || self.device.starts_with("NPU."),
+                "--npu-platform and --npu-compiler-type require --device NPU or NPU.<index>"
+            );
+        }
+        if let Some(platform) = &self.npu_platform {
+            anyhow::ensure!(
+                !platform.is_empty() && platform.bytes().all(|b| b.is_ascii_digit()),
+                "--npu-platform must be a numeric platform ID, such as 3720"
+            );
+            properties.push(("NPU_PLATFORM", platform.clone()));
+        }
+        if let Some(compiler) = self.npu_compiler_type {
+            properties.push(("NPU_COMPILER_TYPE", compiler.property_value().to_string()));
+        }
+        Ok(properties)
+    }
+}
+#[cfg(test)]
+mod npu_tests {
+    use super::*;
+    #[test]
+    fn explicit_npu_configuration() {
+        let a = Args::try_parse_from([
+            "dino-cli",
+            "--npu-platform",
+            "3720",
+            "--npu-compiler-type",
+            "driver",
+            "devices",
+        ])
+        .unwrap();
+        assert_eq!(
+            a.npu_properties().unwrap(),
+            vec![
+                ("NPU_PLATFORM", "3720".into()),
+                ("NPU_COMPILER_TYPE", "DRIVER".into())
+            ]
+        );
+    }
+    #[test]
+    fn defaults_do_not_override_openvino() {
+        let a = Args::try_parse_from(["dino-cli", "devices"]).unwrap();
+        assert!(a.npu_properties().unwrap().is_empty());
+    }
+    #[test]
+    fn rejects_invalid_target() {
+        let a = Args::try_parse_from([
+            "dino-cli",
+            "--device",
+            "CPU",
+            "--npu-platform",
+            "3720",
+            "devices",
+        ])
+        .unwrap();
+        assert!(a.npu_properties().is_err());
+        let a = Args::try_parse_from(["dino-cli", "--npu-platform", "invalid", "devices"]).unwrap();
+        assert!(a.npu_properties().is_err());
+    }
 }

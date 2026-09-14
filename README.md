@@ -145,3 +145,17 @@ uv run --with openvino --with pillow python tests/smoke.py
 Python is used only to generate a tiny deterministic OpenVINO test graph and pixel fixtures. The smoke test invokes the actual Rust binary and CPU runtime, checking embeddings, comparison, search, raw inference, classification, metadata, binary output and error paths. CI runs the same checks. These tests do not validate accuracy of downloaded pretrained models or accelerator compatibility.
 
 API references: [Intel OpenVINO Rust bindings](https://github.com/intel/openvino-rs), [Hugging Face Hub Rust client](https://github.com/huggingface/hf-hub).
+
+## NPU compiler troubleshooting
+
+If compilation fails with `Unsupported platform: 'AUTO_DETECT'`, pass the hardware platform explicitly:
+
+```sh
+dino-cli -hf Xenova/dinov2-small --model-file onnx/model.onnx --device NPU --npu-platform 3720 --size 224x224 --output-name last_hidden_state --pooling cls compare a.jpg b.jpg
+```
+
+`3720` is the target for Meteor Lake (including Core Ultra 7 155H) and Arrow Lake. Other generations use other IDs; consult [Intel's platform table](https://github.com/openvinotoolkit/openvino/blob/master/src/plugins/intel_npu/README.md). Setting a target fixes compiler target selection; it does not install drivers or guarantee that the compiled model can execute.
+
+`--npu-compiler-type driver` selects the compiler provided by the NPU driver. `--npu-compiler-type plugin` selects OpenVINO's bundled compiler. `prefer-plugin` requests OpenVINO's preference/fallback policy when supported by the installed version. Neither option is forced by default. These flags set OpenVINO properties before compilation and require an NPU device selection; they do not rely on developer-build environment variables.
+
+The option parsing/property mapping is tested without hardware. NPU compilation and execution still require validation on the target machine.

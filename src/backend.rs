@@ -5,7 +5,7 @@ use crate::{
     resolve::Files,
 };
 use anyhow::{ensure, Context, Result};
-use openvino::{Core, ElementType, InferRequest, PartialShape, Shape, Tensor};
+use openvino::{Core, ElementType, InferRequest, PartialShape, RwPropertyKey, Shape, Tensor};
 use serde::Serialize;
 use std::path::Path;
 #[derive(Serialize)]
@@ -80,6 +80,14 @@ impl Encoder {
                     .unwrap_or_else(|_| format!("output_{i}")))
             })
             .collect::<Result<Vec<_>>>()?;
+        for (key, value) in a.npu_properties()? {
+            c.set_property(
+                &a.device.as_str().into(),
+                &RwPropertyKey::Other(key.into()),
+                &value,
+            )
+            .with_context(|| format!("Setting {key}={value} on {}", a.device))?;
+        }
         let mut compiled=c.compile_model(&m,a.device.as_str().into()).with_context(||format!("Cannot compile on {}. Check `devices`; use --device CPU to test CPU explicitly.",a.device))?;
         let request = compiled.create_infer_request()?;
         Ok(Self {

@@ -41,6 +41,7 @@ fn emit(v: &impl serde::Serialize) -> Result<()> {
     Ok(())
 }
 fn run(a: Args) -> Result<()> {
+    a.npu_properties()?;
     if let Some(path) = &a.ov_library {
         openvino_sys::library::load_from(path)
             .map_err(|e| anyhow::anyhow!("Loading OpenVINO runtime: {e}"))?;
